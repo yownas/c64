@@ -1,6 +1,6 @@
 name := hello-world
 
-all: run
+all: build
 
 clean:
 	rm -f ${name}.prg
@@ -14,5 +14,7 @@ reset:
 run: build
 	curl -vF "file=@${name}.prg" "http://c64/v1/runners:run_prg"
 
-build: hello-world.asm
+${name}.prg:
 	acme -v9 ${name}.asm
+
+build: ${name}.prg

@@ -23,14 +23,26 @@ loop
     lda $c5
     and #$01
     beq loop			; If not pressed, continue looping
+    jsr restore
     rts				; If pressed, exit
 
 blank
-    jsr $e544			; clear?
-    lda #$00
+    jsr $e544			; clear
+    lda $d020			; save old colors
+    sta store
+    lda $d021
+    sta store+1
+    lda #$00			; black
     sta $d020
     sta $d021
     rts
+
+restore
+    lda store
+    sta $d020
+    lda store+1
+    sta $d021
+    rta
 
 init_text
     ldx #$00			; load x register with $00
@@ -42,5 +54,7 @@ loop_text
     bne loop_text		; loop if false
     rts
 
+store
+    !byte $00,$00,$00
 message
-    !scr "              hello world!              "		;40 cols of text
+    !scr "           -= hello world! =-           "		;40 cols of text
