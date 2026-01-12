@@ -20,12 +20,12 @@ entry
     jsr init_text		; write line of text
 
 loop
-    lda $c5
-    and #$01
-    beq loop			; If not pressed, continue looping
+    lda $91			; STKEY - check if stop key was pressed
+    bmi loop			; negative? then loop
     jsr restore
-    rts				; If pressed, exit
+    rts
 
+; clear screen and store background colors
 blank
     jsr $e544			; clear
     lda $d020			; save old colors
@@ -37,12 +37,13 @@ blank
     sta $d021
     rts
 
+; restore background colors
 restore
     lda store
     sta $d020
     lda store+1
     sta $d021
-    rta
+    rts
 
 init_text
     ldx #$00			; load x register with $00
@@ -55,6 +56,6 @@ loop_text
     rts
 
 store
-    !byte $00,$00,$00
+    !byte $00,$00
 message
     !scr "           -= hello world! =-           "		;40 cols of text

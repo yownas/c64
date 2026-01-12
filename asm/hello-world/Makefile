@@ -14,7 +14,7 @@ reset:
 run: build
 	curl -vF "file=@${name}.prg" "http://c64/v1/runners:run_prg"
 
-${name}.prg:
+${name}.prg: ${name}.asm
 	acme -v9 ${name}.asm
 
 build: ${name}.prg
