@@ -69,43 +69,16 @@ loop_text
     bne loop_text		; loop if false
     rts
 
-;random
-;    // generate random number between 0 and 255
-;    lda CIA1_TIMER_A_LO
-;    eor CIA1_TIMER_A_HI
-;    eor CIA2_TIMER_A_LO
-;    adc CIA2_TIMER_A_HI
-;    eor CIA2_TIMER_B_LO
-;    eor CIA2_TIMER_B_HI
-;
-;    // greater than 99? then subtract 100
-;    cmp #100
-;    bcc rnd_done
-;    sbc #100
-;
-;    // still greater than 99? then subtract 100 more
-;    cmp #100
-;    bcc rnd_done
-;    sbc #100
-;
-;    clc
-;rnd_done
-;    adc #1
-
+;========================
+!zone WAVE_FUNCTIONS
+;========================
+; Do the thing
 
 wave_init
     lda #$00			; Set X & Y to 0
     sta wave_pos
     sta wave_pos+1
-
-    lda #$53
-    sta $0401
     rts
-
-;========================
-!zone WAVE_FUNCTION
-;========================
-; Do the thing
 
 wave
     ; Find number of lowest choices - if we find one with 0 -> fail, goto blank
@@ -126,21 +99,29 @@ wave
     jsr random
     sta wave_pos+1
     
-    ldx shape_count
-    jsr random
-    rol
-    tax
-    dex
-    lda shapes,x
+;    ldx shape_count	; Get random shape
+;    jsr random
+;    rol
+;    tax
+;    dex
+;    lda shapes,x
+
+    jsr getchar
+    adc #$01
     jsr putchar
    
     rts
+
+wave_pos
+    !byte $00, $00
+wave_tmp
+    !byte $00
 
 ;========================
 !zone CHAR
 ;========================
 
-wave_ptr = $fb			; Unused byte in ZP
+wave_ptr = $fb			; Unused word in ZP
 putchar
     sta .tmp_char
     lda #$00
@@ -165,15 +146,32 @@ putchar
     sta (wave_ptr),y
     rts
 
+getchar
+    lda #$00
+    sta wave_tmp
+    sta wave_ptr+1
+
+    ; Get X offset
+    lda wave_pos
+
+    jsr mul40			; return A * 40
+
+    clc				; Add base addr $0400 (screen)
+    lda #$00
+    adc wave_ptr
+    sta wave_ptr
+    lda #$04
+    adc wave_ptr+1
+    sta wave_ptr+1
+    
+    ldy #$00
+    lda (wave_ptr),y
+    rts
+
 .tmp_char
     !byte $00
 
-;========================
-!zone RANDOM
-; Return A * 40 to wave_ptr
 ; FIXME clean up, take two addresses instead of A
-;========================
-
 mul40
     sta .in
     sta wave_ptr
@@ -188,7 +186,7 @@ wave_mul32
     bne wave_mul32
     
     lda .in
-    asl			; * 8
+    asl				; * 8
     rol .mul_tmp
     asl
     rol .mul_tmp
@@ -222,10 +220,15 @@ wave_mul32
 
 random
     stx .rnd_mod
-    lda $dc04
+    lda $dc04			; Timer A
+    adc .rnd_pool+1		; Add pool
     adc .rnd_pool
-    sta .rnd_pool
-.mod
+    sta .rnd_pool		; Store current to pool
+    ror				; Mix
+    ror
+    ror
+    sta .rnd_pool+1
+.mod				; mod X
     sec 
     sbc .rnd_mod
     bcs .mod
@@ -235,7 +238,7 @@ random
 .rnd_mod
     !byte $00, $00
 .rnd_pool
-    !byte $00
+    !byte $00,$00
 
 ;========================
 !zone SHAPE_FUN
@@ -261,31 +264,28 @@ init_shapes
 ;========================
 ; Store the things
 
-wave_pos
-    !byte $00, $00
-wave_tmp
-    !byte $00
-
 store
     ; BG color 1, 2
     !byte $00,$00
 
 shape_count
-    !byte $00
+    !byte $00		; run init_shapes to set this
 shapes
     ; * = $2a, dot = $71
     ; SPACE, LD, UR, LU, DR
     ; !byte $20, $69, $6a, $6b, $75
 
     ; CHAR, 0000DownRightLeftUp
-    !byte $20, %00000000 ; SPACE
     !byte $49, %00001010 ; LD
     !byte $4a, %00000101 ; UR
     !byte $4b, %00000011 ; LU
     !byte $55, %00001100 ; DR
-    !byte $51, %00000000 ; DOT
+    !byte $5b, %00001111 ; Cross
 
     !byte $00 ; END
+
+    !byte $20, %00000000 ; SPACE
+    !byte $51, %00000000 ; DOT
 
 message
     !scr "           -= hello world! =-           "		;40 cols of text
