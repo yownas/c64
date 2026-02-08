@@ -26,7 +26,6 @@
 entry
     jsr blank
     jsr init_shapes    
-    jsr init_text
     jsr wave_init
 
 loop
@@ -40,7 +39,6 @@ loop
 
 ; clear screen and store background colors
 blank
-; TODO loop 40 x 25 and set characters and colors to blank
     jsr $e544			; clear
     lda $d020			; save old colors
     sta store
@@ -59,6 +57,7 @@ restore
     sta $d021
     rts
 
+; not used
 init_text
     ldx #$00			; load x register with $00
 loop_text
@@ -75,13 +74,88 @@ loop_text
 ; Do the thing
 
 wave_init
+    ; Fill screen
     lda #$00			; Set X & Y to 0
     sta wave_pos
     sta wave_pos+1
+    sta wave_pass
+    lda #$53			; char to fill with
+    sta wave_char
+.fill_loop
+    lda wave_char
+    jsr putchar
+    inc wave_pos+1
+    lda wave_pos+1
+    cmp #40
+    bcc .fill_loop
+    lda #$00		; Back to start
+    sta wave_pos+1
+    inc wave_pos	; Next row
+    lda wave_pos
+    cmp #25
+    bcc .fill_loop
+
+    lda #$00			; Set X & Y to 0 (again)
+    sta wave_pos
+    sta wave_pos+1
+
     rts
 
 wave
+    ; FIXME: 
+    ;  pass 0: count possible shapes for all
+    ;  pass 1: find lowest (lowest has count of 0 -> end)
+    ;  pass 2: pick random place, place random masked shape -> pass 0
+    ;  pass 3: end, done
+
     ; Find number of lowest choices - if we find one with 0 -> fail, goto blank
+    lda #$00		; Reset char, counter and pos
+    sta wave_pos
+    sta wave_pos+1
+    sta wave_char
+    sta wave_cnt+1
+    lda #$01
+    sta wave_cnt
+
+    jsr getchar
+    sta wave_char
+.search_loop
+    ; inc wave_pos+1
+    inc wave_pos+1
+    lda wave_pos+1
+    cmp #40
+    bcc .search_loop_end
+    lda #$00		; Back to start
+    sta wave_pos+1
+    inc wave_pos	; Next row
+    lda wave_pos
+    cmp #25
+    bcs .search_end
+    lda #$00		; Back to start
+    sta wave_pos
+.search_loop_end
+
+;if not "empty", rts
+
+;    jsr getmask
+;get & add masks form neighbours
+; Mask is what current char need: UpLeftRigthDown
+;   UDLR ->
+; U 0100 -> 100
+; D 1000 -> 0100
+; L 0001 -> 0010
+; R 0010 -> 0001
+;      or = mask
+;count shapes matching  mask
+    
+
+; if same as wave_char, count up
+; if lower than wave_char, switch    
+; if higher than wave_char, skip
+
+.search_end
+    ; We should have wave_cnt of wave_char, the lowest char on screen
+
     ; Select random
     ; Check choises - If empty, just pick random shape
       ; find char in rules; for up, left, right, down
@@ -99,19 +173,22 @@ wave
     jsr random
     sta wave_pos+1
     
-;    ldx shape_count	; Get random shape
-;    jsr random
-;    rol
-;    tax
-;    dex
-;    lda shapes,x
-
-    jsr getchar
-    adc #$01
+    ldx shape_count	; Get random shape
+    jsr random
+    rol
+    tax
+    dex
+    lda shapes,x
     jsr putchar
    
     rts
 
+wave_pass
+    !byte $00
+wave_char
+    !byte $00
+wave_cnt
+    !byte $00,$00
 wave_pos
     !byte $00, $00
 wave_tmp
@@ -171,7 +248,7 @@ getchar
 .tmp_char
     !byte $00
 
-; FIXME clean up, take two addresses instead of A
+; FIXME clean up, take two addresses instead of A?
 mul40
     sta .in
     sta wave_ptr
@@ -256,8 +333,8 @@ init_shapes
     iny
     jmp .cnt_loop
 .cnt_end
-   stx shape_count
-   rts 
+    stx shape_count
+    rts 
 
 ;========================
 !zone DATA
@@ -271,20 +348,26 @@ store
 shape_count
     !byte $00		; run init_shapes to set this
 shapes
-    ; * = $2a, dot = $71
-    ; SPACE, LD, UR, LU, DR
-    ; !byte $20, $69, $6a, $6b, $75
-
-    ; CHAR, 0000DownRightLeftUp
-    !byte $49, %00001010 ; LD
-    !byte $4a, %00000101 ; UR
-    !byte $4b, %00000011 ; LU
-    !byte $55, %00001100 ; DR
+    ; CHAR, 0000UpDownLeftRight
+    !byte $49, %00000110 ; LD curve
+    !byte $4a, %00001001 ; UR curve
+    !byte $4b, %00001010 ; LU curve
+    !byte $55, %00000101 ; DR curve
     !byte $5b, %00001111 ; Cross
 
-    !byte $00 ; END
+    !byte $6e, %00000110 ; LD
+    !byte $6d, %00001001 ; UR
+    !byte $7d, %00001010 ; LU
+    !byte $70, %00000101 ; DR
+
+    !byte $6b, %00001101 ; UDR
+    !byte $72, %00000111 ; DLR
+    !byte $73, %00001110 ; UDL
+    !byte $71, %00001011 ; ULR
 
     !byte $20, %00000000 ; SPACE
+    !byte $00 ; END
+
     !byte $51, %00000000 ; DOT
 
 message
